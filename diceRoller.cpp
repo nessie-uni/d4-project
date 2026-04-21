@@ -1,23 +1,35 @@
 #include "splashkit.h"
+#include <cstdlib>
+#include <ctime>
 
 enum menu_options
 {
     ROLL_DIE = 1,
     EDIT_CUSTOM,
     SEE_HISTORY,
-    QUIT
+    QUIT_APP
 };
 struct die_history
 {
-    int previous_rolls[5];
+    int previous_rolls[5] = {-1, -1, -1, -1, -1};
     int length = 0;
 
     void add(int new_roll)
     {
-
-        for (int i = length - 1; i > 0; i++)
+        if (length == 0)
         {
-            if (i == 1)
+            previous_rolls[0] = new_roll;
+            length = 1;
+            return;
+        }
+
+        for (int i = length; i >= 0; i--)
+        {
+            if (i == 5)
+            {
+                continue;
+            }
+            if (i == 0)
             {
                 previous_rolls[0] = new_roll;
                 continue;
@@ -55,8 +67,7 @@ public:
 
     int roll()
     {
-        long random_value = random();
-        int value = (int)(random_value * _maximum) + 1;
+        int value = (rand() % _maximum) + 1;
         _history.add(value);
         return value;
     }
@@ -68,11 +79,16 @@ public:
 
     int get_past_value(int history_counter)
     {
-        if (history_counter >= _history.length || history_counter < 0)
+        if (history_counter > _history.length || history_counter <= 0)
         {
             throw "Index out of bounds";
         }
-        return _history.previous_rolls[history_counter];
+        return _history.previous_rolls[history_counter - 1];
+    }
+
+    string die_type()
+    {
+        return "D" + to_string(_maximum);
     }
 };
 
@@ -90,7 +106,11 @@ public:
     CustomDie(int maximum, int minimun) {}
     CustomDie(int maximun, int minimum, int step) {}
     CustomDie(int options[6]) {}
-    int roll() {}
+    int roll()
+    {
+        // PLACEHOLDER
+        return 1;
+    }
 };
 
 struct die_cup
@@ -166,33 +186,44 @@ class Program
         write_line("4: Quit");
     }
 
+    void print_dice(die_cup dice)
+    {
+        for (int i = 0; i < dice.length; i++)
+        {
+            write_line("Die " + to_string(i + 1) + ": " + dice.dice[i].die_type());
+        }
+    }
     int roll_a_die(die_cup &dice)
     {
+        print_dice(dice);
         int chosen_die_index = input_int("Choose a die to roll: ", 1, dice.length);
-        Die *chosen_die = &dice.dice[chosen_die_index];
-
+        Die *chosen_die = &dice.dice[chosen_die_index - 1];
         (*chosen_die).roll();
         // Future: If you ever need to do something to a die after rolling it, it can be done below.
         // Techincally the last line could be returned, but I'm doing it separately.
-        return (*chosen_die).get_past_value(0);
+        int past_value = (*chosen_die).get_past_value(1);
+
+        return past_value;
     }
 
     void print_history(die_cup dice)
     {
+        print_dice(dice);
         int chosen_die_index = input_int("Choose a die to see the history of: ", 1, dice.length);
-        Die *chosen_die = &dice.dice[chosen_die_index];
+        Die *chosen_die = &dice.dice[chosen_die_index - 1];
         die_history history = (*chosen_die).get_history();
         string position_honorific[5] = {"st", "nd", "rd", "th", "th"};
 
-        write_line("History of the d" + to_string(chosen_die_index) + ":");
-        
+        write_line("History of the " + (*chosen_die).die_type() + ":");
+
         for (int i = 0; i < history.length; i++)
         {
-            write_line(to_string(i) + position_honorific[i] + ": " + to_string(history.previous_rolls[i]));
+            write_line(to_string(i + 1) + position_honorific[i] + ": " + to_string(history.previous_rolls[i]));
         }
         write_line("End history (max 5 values).");
     }
 
+public:
     int main()
     {
         // Set up:
@@ -202,6 +233,7 @@ class Program
         // Begin app loop
         do
         {
+            print_main_menu_options();
             user_selection = input_int("Menu option: ", 1, 4);
 
             // Choose option: roll die, edit custom, see history, quit
@@ -215,10 +247,12 @@ class Program
             switch (user_selection)
             {
             case ROLL_DIE:
+            {
                 write_line("------Roll a Die------");
                 int rolled = roll_a_die(dice);
                 write_line("You rolled a " + to_string(rolled));
                 break;
+            }
             case EDIT_CUSTOM:
                 // Edit the custom die (WIP)
                 write_line("------Edit the Custom Die------");
@@ -226,9 +260,10 @@ class Program
                 break;
             case SEE_HISTORY:
                 write_line("------See History------");
+                print_history(dice);
                 // See history of a die
                 break;
-            case QUIT:
+            case QUIT_APP:
                 // Do nothing, user wants to quit
                 break;
             default:
@@ -239,3 +274,9 @@ class Program
         return 0;
     }
 };
+int main()
+{
+    srand(time(0));
+    Program program = Program();
+    program.main();
+}
