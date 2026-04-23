@@ -2,7 +2,6 @@
 #include <cstdlib>
 #include <ctime>
 #include <climits>
-#include <string.h>
 #include <typeinfo>
 /**
  * @brief The menu options within the Roller class.
@@ -45,9 +44,24 @@ enum edit_custom_menu_options
  */
 struct die_history
 {
+public:
+    /**
+     * @brief A list of the historical rolls of the die. At most five.
+     *
+     */
     int previous_rolls[5] = {-1, -1, -1, -1, -1};
+
+    /**
+     * @brief The length of the list of historical values of the die. At most five.
+     *
+     */
     int length = 0;
 
+    /**
+     * @brief Adds a new roll to the history of the die, moving older rolls as necessary.
+     *
+     * @param new_roll The new value to be added to the history.
+     */
     void add(int new_roll)
     {
         if (length == 0)
@@ -78,6 +92,31 @@ struct die_history
 };
 
 /**
+ * @brief Designed to hold the dice used in the program. Holds a d4, d6, d8, d10, d12, d20, d100, and the custom die. Not intended for use by anything else.
+ *
+ */
+struct die_cup
+{
+    /**
+     * @brief A list of regular dice held in the die cup.
+     *
+     */
+    Die dice[7] = {Die(4), Die(6), Die(8), Die(10), Die(12), Die(20), Die(100)};
+
+    /**
+     * @brief The number of REGULAR dice in the die cup.
+     *
+     */
+    int length = 7;
+
+    /**
+     * @brief A custom die in the die cup. By default, it is a d1000.
+     *
+     */
+    CustomDie custom = CustomDie(1000, 1, 1);
+};
+
+/**
  * @brief A rollable die with history of the past (up to) 5 values. Maximum value can be set in the constructor.
  *
  */
@@ -89,7 +128,7 @@ protected:
 
 public:
     /**
-     * @brief Construct a new Die object. Size will be 6.
+     * @brief Construct a new Die object.
      *
      */
     Die()
@@ -127,7 +166,7 @@ public:
     /**
      * @brief Get the history of the die.
      *
-     * @return The history of the die (up to 5 rolls).
+     * @return The history of the die in a die_history struct.
      */
     die_history get_history()
     {
@@ -137,7 +176,7 @@ public:
     /**
      * @brief Get an historical roll of the die.
      *
-     * @param history_counter The number of values to go into the history. Throws an exception (string) if value does not exist. Minimum value: 1. Maimum value: min(5, _history.length).
+     * @param history_counter The number of values to go into the history. Throws an exception (string) if value does not exist. Minimum value: 1. Maximum value: min(5, _history.length).
      * @return The historical roll of the die.
      */
     int get_past_value(int history_counter)
@@ -150,7 +189,7 @@ public:
     }
 
     /**
-     * @brief Returns the type of the die (e.g. d4, d6)
+     * @brief Returns the type of the die (e.g. d4, d6, custom)
      *
      * @return The die type.
      */
@@ -173,6 +212,10 @@ private:
     int _mode;
 
 public:
+    /**
+     * @brief Construct a new Custom Die object.
+     *
+     */
     CustomDie()
     {
         _minimum = 1;
@@ -181,10 +224,28 @@ public:
         _mode = MIN_TO_MAX;
     }
 
+    /**
+     * @brief Construct a new Custom Die object.
+     * 
+     * @param maximum The maximum value on the die (inclusive).
+     */
     CustomDie(int maximum) : CustomDie(maximum, 1, 1) {}
 
+    /**
+     * @brief Construct a new Custom Die object.
+     * 
+     * @param maximum The maximum value on the die (inclusive).
+     * @param minimum The minimum value on the die (inclusive). Cannot equal maximum.
+     */
     CustomDie(int maximum, int minimum) : CustomDie(maximum, minimum, 1) {}
 
+    /**
+     * @brief Construct a new Custom Die object.
+     * 
+     * @param maximum The maximum value on the die (inclusive).
+     * @param minimum The minimum value on the die (inclusive). Cannot equal maximum.
+     * @param step The difference between values on the die. Must be greater than 0.
+     */
     CustomDie(int maximum, int minimum, int step)
     {
         if (minimum == maximum)
@@ -219,10 +280,14 @@ public:
         }
     }
 
+    /**
+     * @brief Construct a new Custom Die object.
+     * 
+     * @param options A list of six custom faces for the die.
+     */
     CustomDie(int options[6])
     {
         // Copy options to _options (surprisingly difficult task in C++)
-        // memcpy(_options, options, 6 * sizeof(int));
         for (int i = 0; i < 6; i++)
         {
             write_line(options[i]);
@@ -231,6 +296,12 @@ public:
 
         _mode = SIX_UNIQUE;
     }
+    
+    /**
+     * @brief Rolls the die.
+     *
+     * @return The value that the die rolled.
+     */
     int roll() override
     {
         int value;
@@ -241,15 +312,6 @@ public:
             break;
         case MIN_TO_MAX_STEP:
         {
-            // If a new value is declared within a case, it must be enclosed in braces.
-            // If min + x*step = max for some int x we must add 1 more option
-            // x will never be more than step
-            // (max-min)/step
-            // for (int i = 0; i < _step; i++)
-            // {
-            //     /* code */
-            // }
-
             int num_options = 0;
             while (_minimum + (_step * num_options) <= _maximum)
             {
@@ -272,6 +334,11 @@ public:
         return value;
     }
 
+    /**
+     * @brief Returns the type of the die (e.g. d4, d6, custom)
+     *
+     * @return The die type.
+     */
     string die_type() override
     {
         switch (_mode)
@@ -301,17 +368,6 @@ public:
         }
         return "Custom die";
     }
-};
-
-/**
- * @brief Designed to hold the dice used in the program. Holds a d4, d6, d8, d10, d12, d20, d100, and the custom die.
- *
- */
-struct die_cup
-{
-    Die dice[7] = {Die(4), Die(6), Die(8), Die(10), Die(12), Die(20), Die(100)};
-    CustomDie custom = CustomDie(3, 1, 1);
-    int length = 7;
 };
 
 /**
@@ -532,6 +588,40 @@ private:
 
 public:
     /**
+     * @brief Test modules for the Custom Die.
+     *
+     */
+    void test_custom_die()
+    {
+        write_line("1 to 5, step 2 (i.e. 1, 3, 5)");
+        CustomDie d = CustomDie(5, 1, 2);
+        int result = 0;
+        do
+        {
+            result = d.roll();
+            write_line(result);
+        } while (result != 5);
+
+        write_line("1 to 5");
+        CustomDie d2 = CustomDie(5, 1);
+        int result2 = 0;
+        do
+        {
+            result2 = d2.roll();
+            write_line(result2);
+        } while (result2 != 5);
+
+        write_line("6 custom options");
+        int options[6] = {1, 7, 10, 3, 11, 5};
+        CustomDie d3 = CustomDie(options);
+        int result3 = 0;
+        do
+        {
+            result3 = d3.roll();
+            write_line(result3);
+        } while (result3 != 5);
+    }
+    /**
      * @brief Runs the dice roller.
      *
      * @return Status code.
@@ -595,35 +685,6 @@ public:
 int main()
 {
     srand(time(0));
-    // Test modules for the Custom Die
-    // write_line("1 to 5, step 2 (i.e. 1, 3, 5)");
-    // CustomDie d = CustomDie(5, 1, 2);
-    // int result = 0;
-    // do
-    // {
-    //     result = d.roll();
-    //     write_line(result);
-    // } while (result != 5);
-
-    // write_line("1 to 5");
-    // CustomDie d2 = CustomDie(5, 1);
-    // int result2 = 0;
-    // do
-    // {
-    //     result2 = d2.roll();
-    //     write_line(result2);
-    // } while (result2 != 5);
-
-    // write_line("6 custom options");
-    // int options[6] = {1, 7, 10, 3, 11, 5};
-    // CustomDie d3 = CustomDie(options);
-    // int result3 = 0;
-    // do
-    // {
-    //     result3 = d3.roll();
-    //     write_line(result3);
-    // } while (result3 != 5);
-
     Roller roller = Roller();
     return roller.main();
 }
