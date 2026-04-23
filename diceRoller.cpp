@@ -1,10 +1,11 @@
 #include "splashkit.h"
 #include <cstdlib>
 #include <ctime>
+#include <string.h>
 
 /**
  * @brief The menu options within the Roller class.
- * 
+ *
  */
 enum menu_options
 {
@@ -16,7 +17,7 @@ enum menu_options
 
 /**
  * @brief A structure to hold the history of a die. Maximum length: 5.
- * 
+ *
  */
 struct die_history
 {
@@ -54,7 +55,7 @@ struct die_history
 
 /**
  * @brief A rollable die with history of the past (up to) 5 values. Maximum value can be set in the constructor.
- * 
+ *
  */
 class Die
 {
@@ -65,7 +66,7 @@ protected:
 public:
     /**
      * @brief Construct a new Die object. Size will be 6.
-     * 
+     *
      */
     Die()
     {
@@ -74,7 +75,7 @@ public:
 
     /**
      * @brief Construct a new Die object.
-     * 
+     *
      * @param size The maximum value on the die (6 gives a classic die).
      */
     Die(int size)
@@ -89,7 +90,7 @@ public:
 
     /**
      * @brief Rolls the die.
-     * 
+     *
      * @return The value that the die rolled.
      */
     int roll()
@@ -101,7 +102,7 @@ public:
 
     /**
      * @brief Get the history of the die.
-     * 
+     *
      * @return The history of the die (up to 5 rolls).
      */
     die_history get_history()
@@ -110,8 +111,8 @@ public:
     }
 
     /**
-     * @brief Get an historical roll of the die. 
-     * 
+     * @brief Get an historical roll of the die.
+     *
      * @param history_counter The number of values to go into the history. Throws an exception (string) if value does not exist. Minimum value: 1. Maimum value: min(5, _history.length).
      * @return The historical roll of the die.
      */
@@ -126,8 +127,8 @@ public:
 
     /**
      * @brief Returns the type of the die (e.g. d4, d6)
-     * 
-     * @return The die type. 
+     *
+     * @return The die type.
      */
     string die_type()
     {
@@ -135,39 +136,115 @@ public:
     }
 };
 
+enum custom_modes
+{
+    MIN_TO_MAX = 0,
+    MIN_TO_MAX_STEP,
+    SIX_UNIQUE
+};
 /**
  * @brief A die with customisable faces. It can be set to have a custom minimum and maximum, and/or a custom step between faces, or six unique faces.
- * 
+ *
  */
 class CustomDie : public Die
 {
 private:
-    int _minimum = 1;
-    int _step = 1;
-    int _options[6];
-    int _mode = 0;
+    int _minimum;
+    int _step;
+    int _options[6]{-1, -1, -1, -1, -1, -1};
+    int _mode;
 
 public:
-    CustomDie() {}
-    CustomDie(int maximum) {}
-    CustomDie(int maximum, int minimun) {}
-    CustomDie(int maximun, int minimum, int step) {}
-    CustomDie(int options[6]) {}
+    CustomDie()
+    {
+        _minimum = 1;
+        _maximum = 6;
+        _step = 1;
+        _mode = MIN_TO_MAX;
+    }
+
+    CustomDie(int maximum) : CustomDie(maximum, 1, 1) {}
+
+    CustomDie(int maximum, int minimum) : CustomDie(maximum, minimum, 1) {}
+
+    CustomDie(int maximum, int minimum, int step)
+    {
+        if (minimum == maximum)
+        {
+            throw "Minimum cannot equal maximum";
+        }
+
+        if (step < 1)
+        {
+            throw "Step must be greater than 0";
+        }
+
+        if (minimum > maximum)
+        {
+            // Swap so that max > min
+            int temp = maximum;
+            maximum = minimum;
+            minimum = temp;
+        }
+
+        _minimum = minimum;
+        _maximum = maximum;
+        _step = step;
+
+        if (_step > 1)
+        {
+            _mode = MIN_TO_MAX_STEP;
+        }
+        else
+        {
+            _mode = MIN_TO_MAX;
+        }
+    }
+
+    CustomDie(int options[6])
+    {
+        // Copy options to _options (surprisingly difficult task in C++)
+        memcpy(_options, options, 6 * sizeof(int));
+        _mode = SIX_UNIQUE;
+    }
     int roll()
     {
-        // PLACEHOLDER
-        return 1;
+        int value;
+        switch (_mode)
+        {
+        case MIN_TO_MAX:
+            // verify below line
+            value = (rand() % (_maximum - _minimum + 1)) + _minimum;
+            break;
+        case MIN_TO_MAX_STEP:
+        {
+            // If a new value is declared within a case, it msut be enclosed in braces.
+            int num_options = (_maximum - _minimum + 1) / _step;
+            int index = rand() % num_options;
+            value = _minimum + _step * index;
+        }
+        break;
+        case SIX_UNIQUE:
+            value = _options[(rand() % 6)];
+            break;
+
+        default:
+            break;
+        }
+        _history.add(value);
+
+        return value;
     }
 };
 
 /**
  * @brief Designed to hold the dice used in the program. Holds a d4, d6, d8, d10, d12, and a d20.
- * 
+ *
  */
 struct die_cup
 {
-    Die dice[6] = {Die(4), Die(6), Die(8), Die(10), Die(12), Die(20)};
-    int length = 6;
+    Die dice[7] = {Die(4), Die(6), Die(8), Die(10), Die(12), Die(20), CustomDie(3, 1, 1)};
+    int length = 7;
 };
 
 /**
@@ -365,6 +442,35 @@ public:
 int main()
 {
     srand(time(0));
+    // Test modules for the Custom Die
+    // write_line("1 to 6, step 2 (i.e. 1, 3, 5)");
+    // CustomDie d = CustomDie(6, 1, 2);
+    // int result = 0;
+    // do
+    // {
+    //     result = d.roll();
+    //     write_line(result);
+    // } while (result != 5);
+
+    // write_line("1 to 5");
+    // CustomDie d2 = CustomDie(5, 1);
+    // int result2 = 0;
+    // do
+    // {
+    //     result2 = d2.roll();
+    //     write_line(result2);
+    // } while (result2 != 5);
+
+    // write_line("6 custom options");
+    // int options[6] = {1, 7, 10, 3, 11, 5};
+    // CustomDie d3 = CustomDie(options);
+    // int result3 = 0;
+    // do
+    // {
+    //     result3 = d3.roll();
+    //     write_line(result3);
+    // } while (result3 != 5);
+
     Roller roller = Roller();
     return roller.main();
 }
