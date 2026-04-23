@@ -1,8 +1,9 @@
 #include "splashkit.h"
 #include <cstdlib>
 #include <ctime>
+#include <climits>
 #include <string.h>
-
+#include <typeinfo>
 /**
  * @brief The menu options within the Roller class.
  *
@@ -13,6 +14,29 @@ enum menu_options
     EDIT_CUSTOM,
     SEE_HISTORY,
     QUIT_APP
+};
+
+/**
+ * @brief The options for the custom die's operation.
+ *
+ */
+enum custom_modes
+{
+    MIN_TO_MAX = 0,
+    MIN_TO_MAX_STEP,
+    SIX_UNIQUE
+};
+
+/**
+ * @brief The menu options within the edit custom die menu.
+ *
+ */
+enum edit_custom_menu_options
+{
+    ONE_TO_X = 1,
+    X_TO_Y,
+    X_TO_Y_STEP_Z,
+    UNIQUE_FACES,
 };
 
 /**
@@ -93,7 +117,7 @@ public:
      *
      * @return The value that the die rolled.
      */
-    int roll()
+    virtual int roll()
     {
         int value = (rand() % _maximum) + 1;
         _history.add(value);
@@ -130,18 +154,12 @@ public:
      *
      * @return The die type.
      */
-    string die_type()
+    virtual string die_type()
     {
         return "d" + to_string(_maximum);
     }
 };
 
-enum custom_modes
-{
-    MIN_TO_MAX = 0,
-    MIN_TO_MAX_STEP,
-    SIX_UNIQUE
-};
 /**
  * @brief A die with customisable faces. It can be set to have a custom minimum and maximum, and/or a custom step between faces, or six unique faces.
  *
@@ -204,22 +222,40 @@ public:
     CustomDie(int options[6])
     {
         // Copy options to _options (surprisingly difficult task in C++)
-        memcpy(_options, options, 6 * sizeof(int));
+        // memcpy(_options, options, 6 * sizeof(int));
+        for (int i = 0; i < 6; i++)
+        {
+            write_line(options[i]);
+            _options[i] = options[i];
+        }
+
         _mode = SIX_UNIQUE;
     }
-    int roll()
+    int roll() override
     {
         int value;
         switch (_mode)
         {
         case MIN_TO_MAX:
-            // verify below line
             value = (rand() % (_maximum - _minimum + 1)) + _minimum;
             break;
         case MIN_TO_MAX_STEP:
         {
-            // If a new value is declared within a case, it msut be enclosed in braces.
-            int num_options = (_maximum - _minimum + 1) / _step;
+            // If a new value is declared within a case, it must be enclosed in braces.
+            // If min + x*step = max for some int x we must add 1 more option
+            // x will never be more than step
+            // (max-min)/step
+            // for (int i = 0; i < _step; i++)
+            // {
+            //     /* code */
+            // }
+
+            int num_options = 0;
+            while (_minimum + (_step * num_options) <= _maximum)
+            {
+                num_options++;
+            }
+
             int index = rand() % num_options;
             value = _minimum + _step * index;
         }
@@ -235,15 +271,46 @@ public:
 
         return value;
     }
+
+    string die_type() override
+    {
+        switch (_mode)
+        {
+        case MIN_TO_MAX:
+            if (_minimum == 1)
+            {
+                return "d" + to_string(_maximum);
+            }
+            return "Die with faces between " +
+                   to_string(_minimum) + " and " +
+                   to_string(_maximum);
+            break;
+
+        case MIN_TO_MAX_STEP:
+            return "Die with faces between " +
+                   to_string(_minimum) + " and " +
+                   to_string(_maximum) + " increasing by " +
+                   to_string(_step);
+            break;
+
+        case SIX_UNIQUE:
+            return "Die with six custom faces";
+            break;
+        default:
+            break;
+        }
+        return "Custom die";
+    }
 };
 
 /**
- * @brief Designed to hold the dice used in the program. Holds a d4, d6, d8, d10, d12, and a d20.
+ * @brief Designed to hold the dice used in the program. Holds a d4, d6, d8, d10, d12, d20, d100, and the custom die.
  *
  */
 struct die_cup
 {
-    Die dice[7] = {Die(4), Die(6), Die(8), Die(10), Die(12), Die(20), CustomDie(3, 1, 1)};
+    Die dice[7] = {Die(4), Die(6), Die(8), Die(10), Die(12), Die(20), Die(100)};
+    CustomDie custom = CustomDie(3, 1, 1);
     int length = 7;
 };
 
@@ -269,6 +336,7 @@ private:
         {
             write_line("Your input of \"" + input + "\" is not a valid integer.");
             write(prompt);
+            input = read_line();
         }
 
         return to_integer(input);
@@ -330,10 +398,64 @@ private:
      */
     void print_dice(die_cup dice)
     {
-        for (int i = 0; i < dice.length; i++)
+        Die *die;
+        for (int i = 0; i < dice.length + 1; i++)
         {
-            write_line("Die " + to_string(i + 1) + ": " + dice.dice[i].die_type());
+            if (i == dice.length)
+            {
+                die = &dice.custom;
+            }
+            else
+            {
+                die = &dice.dice[i];
+            }
+
+            write_line("Die " + to_string(i + 1) + ": " + die->die_type());
         }
+    }
+
+    /**
+     * @brief Prints the custom edit menu.
+     *
+     */
+    void print_edit_custom_menu()
+    {
+        write_line("Choose a type of custom die:");
+        write_line("1: Faces from 1-x (dx)");
+        write_line("2: Faces from x-y");
+        write_line("3: Faces from x-y increasing by z");
+        write_line("4: Six custom faces");
+    }
+
+    /**
+     * @brief Prints the history of a user-chosen die from the die cup. Due to how the history struct is modified, shows a maximum of 5 values.
+     *
+     * @param dice The dice that the user can choose from to print the history of.
+     */
+    void print_history(die_cup dice)
+    {
+        print_dice(dice);
+        int chosen_die_index = input_int("Choose a die to see the history of: ", 1, dice.length + 1);
+        Die *chosen_die;
+        if (chosen_die_index == dice.length + 1)
+        {
+            chosen_die = &dice.custom;
+        }
+        else
+        {
+            chosen_die = &dice.dice[chosen_die_index - 1];
+        }
+
+        die_history history = (*chosen_die).get_history();
+        string position_honorific[5] = {"st", "nd", "rd", "th", "th"};
+
+        write_line("History of the " + (*chosen_die).die_type() + ":");
+
+        for (int i = 0; i < history.length; i++)
+        {
+            write_line(to_string(i + 1) + position_honorific[i] + ": " + to_string(history.previous_rolls[i]));
+        }
+        write_line("End history (max 5 values).");
     }
 
     /**
@@ -345,9 +467,13 @@ private:
     int roll_a_die(die_cup &dice)
     {
         print_dice(dice);
-        int chosen_die_index = input_int("Choose a die to roll: ", 1, dice.length);
+        int chosen_die_index = input_int("Choose a die to roll: ", 1, dice.length + 1);
+        if (chosen_die_index == dice.length + 1)
+        {
+            return dice.custom.roll();
+        }
         Die *chosen_die = &dice.dice[chosen_die_index - 1];
-        (*chosen_die).roll();
+        chosen_die->roll();
         // Future: If you ever need to do something to a die after rolling it, it can be done below.
         // Techincally the line before this comment could be returned, but I'm doing it separately.
         int past_value = (*chosen_die).get_past_value(1);
@@ -356,25 +482,52 @@ private:
     }
 
     /**
-     * @brief Prints the history of a user-chosen die from the die cup. Due to how the history struct is modified, shows a maximum of 5 values.
+     * @brief Prompts the user to edit the custom die.
      *
-     * @param dice The dice that the user can choose from to print the history of.
+     * @return The updated (or previous) custom die.
      */
-    void print_history(die_cup dice)
+    CustomDie edit_custom_die()
     {
-        print_dice(dice);
-        int chosen_die_index = input_int("Choose a die to see the history of: ", 1, dice.length);
-        Die *chosen_die = &dice.dice[chosen_die_index - 1];
-        die_history history = (*chosen_die).get_history();
-        string position_honorific[5] = {"st", "nd", "rd", "th", "th"};
-
-        write_line("History of the " + (*chosen_die).die_type() + ":");
-
-        for (int i = 0; i < history.length; i++)
+        print_edit_custom_menu();
+        int choice = input_int("Menu option: ", 1, 4);
+        switch (choice)
         {
-            write_line(to_string(i + 1) + position_honorific[i] + ": " + to_string(history.previous_rolls[i]));
+        case ONE_TO_X:
+        {
+            int upper_bound = input_int("Choose an upper bound: ", 2, INT_MAX);
+            return CustomDie(upper_bound);
+            break;
         }
-        write_line("End history (max 5 values).");
+        case X_TO_Y:
+        {
+            int lower_bound = input_int("Choose a lower bound: ", INT_MIN, INT_MAX - 1);
+            int upper_bound = input_int("Choose an upper bound: ", lower_bound + 1, INT_MAX);
+            return CustomDie(upper_bound, lower_bound);
+        }
+        case X_TO_Y_STEP_Z:
+        {
+            int lower_bound = input_int("Choose a lower bound: ", INT_MIN, INT_MAX - 1);
+            int upper_bound = input_int("Choose an upper bound: ", lower_bound + 1, INT_MAX);
+            int step = input_int("Choose a step: ", 1, upper_bound - lower_bound);
+            return CustomDie(upper_bound, lower_bound, step);
+        }
+        case UNIQUE_FACES:
+        {
+            int faces[6];
+            string position_honorific[6] = {"st", "nd", "rd", "th", "th", "th"};
+
+            for (int i = 0; i < 6; i++)
+            {
+                faces[i] = input_int("Input the " + to_string(i + 1) + position_honorific[i] + " value: ");
+            }
+            return CustomDie(faces);
+            break;
+        }
+
+        default:
+            break;
+        }
+        return CustomDie(6);
     }
 
 public:
@@ -394,7 +547,7 @@ public:
         {
             print_main_menu_options();
             user_selection = input_int("Menu option: ", 1, 4);
-
+            write_line();
             // Choose option: roll die, edit custom, see history, quit
             // Choose die to roll, roll it
             // Return its roll
@@ -415,7 +568,7 @@ public:
             case EDIT_CUSTOM:
                 // Edit the custom die (WIP)
                 write_line("------Edit the Custom Die------");
-                write_line("Not yet implemented; no custom die yet");
+                dice.custom = edit_custom_die();
                 break;
             case SEE_HISTORY:
                 write_line("------See History------");
@@ -443,8 +596,8 @@ int main()
 {
     srand(time(0));
     // Test modules for the Custom Die
-    // write_line("1 to 6, step 2 (i.e. 1, 3, 5)");
-    // CustomDie d = CustomDie(6, 1, 2);
+    // write_line("1 to 5, step 2 (i.e. 1, 3, 5)");
+    // CustomDie d = CustomDie(5, 1, 2);
     // int result = 0;
     // do
     // {
