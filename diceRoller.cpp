@@ -50,7 +50,7 @@ enum edit_custom_menu_options
 struct die_history
 {
 public:
-    // Set all previous rolls slots to -1 so that if there are errors that show more values than there should be it is easily detectable (and not random numbers from whatever was in memory previously).
+    // Set all previous roll slots to -1 so that if there are errors that show more values than there should be it is easily detectable (and not random numbers from whatever was in memory previously).
 
     /**
      * @brief A list of the historical rolls of the die. At most five.
@@ -114,15 +114,14 @@ protected:
     die_history _history;
 
 public:
+    // Default operation is to make a d6.
+    // Uses constructor overloading to condense code into one constructor for maintainability.
+
     /**
      * @brief Construct a new Die object.
      *
      */
-    Die()
-    {
-        // Default operation is to make a d6 (classic die).
-        Die(6);
-    }
+    Die() : Die(6) {}
 
     /**
      * @brief Construct a new Die object.
@@ -187,7 +186,7 @@ public:
      *
      * @return The die type.
      */
-    virtual string die_type()
+    virtual string get_die_type()
     {
         return "d" + to_string(_maximum);
     }
@@ -202,7 +201,7 @@ class CustomDie : public Die
 private:
     int _minimum;
     int _step;
-    int _options[6]{-1, -1, -1, -1, -1, -1};
+    int _options[6] = {-1, -1, -1, -1, -1, -1};
     int _mode;
 
 public:
@@ -268,7 +267,7 @@ public:
 
         // While technically the step mode can operate with a step of 1, it's more computationally
         // efficient to use the non-step mode (step mode has an ~O(log(n)) operation).
-        if (_step > 1)
+        if (_step > 1) 
         {
             _mode = MIN_TO_MAX_STEP;
         }
@@ -354,7 +353,7 @@ public:
      *
      * @return The die type.
      */
-    string die_type() override
+    string get_die_type() override
     {
         switch (_mode)
         {
@@ -532,7 +531,7 @@ private:
                 die = &dice.dice[i];
             }
 
-            write_line("Die " + to_string(i + 1) + ": " + die->die_type());
+            write_line("Die " + to_string(i + 1) + ": " + die->get_die_type());
         }
     }
 
@@ -578,7 +577,7 @@ private:
         }
 
         die_history history = chosen_die->get_history();
-        write_line("History of the " + chosen_die->die_type() + ":");
+        write_line("History of the " + chosen_die->get_die_type() + ":");
 
         for (int i = 0; i < history.length; i++)
         {
@@ -599,17 +598,21 @@ private:
         int chosen_die_index = input_int("Choose a die to roll (1-" + to_string(dice.length + 1) + "): ",
                                          1,
                                          dice.length + 1);
-        if (chosen_die_index == dice.length + 1)
-        {
-            return dice.custom.roll();
-        }
+        Die *chosen_die;
 
         // Point the pointer to the correct die for this operation. A pointer is used here because
         // using a pointer with the '->' operator as opposed to where it points to with the '.'
         // operator because the former allows for polymorphic coding - it will call the most
         // overridden variants of any overridden methods, such as those in the CustomDie class.
 
-        Die *chosen_die = &dice.dice[chosen_die_index - 1];
+        if (chosen_die_index == dice.length + 1)
+        {
+            chosen_die = &dice.custom;
+        }
+        else
+        {
+            chosen_die = &dice.dice[chosen_die_index - 1];
+        }
 
         int result = chosen_die->roll();
 
