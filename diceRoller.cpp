@@ -782,7 +782,7 @@ public:
             default:
                 break;
             }
-        } while (user_selection != 4);
+        } while (user_selection != QUIT_APP);
 
         // Successfully completed.
         return 0;
